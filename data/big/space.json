@@ -1,0 +1,38 @@
+{
+  "cartesian_size": 1.80101e+14,
+  "feasible_size": 26238,
+  "space_feasible_density": 1.45685e-10,
+  "space_build_seconds": 0.0552808,
+  "solver": {"cartesian": 1.80101e+14, "solutions": 26238, "nodes": 52741, "failures": 133, "complete": true},
+  "constraints": [
+    {"constraint": "4096 % gemv.M.mram == 0", "disposition": "static-filter"},
+    {"constraint": "4096 % gemv.K.mram == 0", "disposition": "static-filter"},
+    {"constraint": "(gemv.M.wram | gemv.M.mram)", "disposition": "solved"},
+    {"constraint": "(gemv.K.wram | gemv.K.mram)", "disposition": "solved"},
+    {"constraint": "(gemv.M.mram | 4096)", "disposition": "solved"},
+    {"constraint": "(gemv.K.mram | 4096)", "disposition": "solved"},
+    {"constraint": "prod(extent / block) == dpus * tasklets", "disposition": "solved"},
+    {"constraint": "tasklets * sum of operand tiles <= mram (assuming no sharing)", "disposition": "solved"},
+    {"constraint": "tasklets * sum of operand tiles <= wram (assuming no sharing)", "disposition": "solved"},
+    {"constraint": "input 0's mram tile must be a whole number of 8-byte DMA granules, i.e. a multiple of 2 elements", "disposition": "solved"},
+    {"constraint": "input 1's mram tile must be a whole number of 8-byte DMA granules, i.e. a multiple of 2 elements", "disposition": "solved"},
+    {"constraint": "output 0's mram tile must be a whole number of 8-byte DMA granules, i.e. a multiple of 2 elements", "disposition": "solved"},
+    {"constraint": "gemv.order: item 0 takes one of the first (number active) places when it is active", "disposition": "solved"},
+    {"constraint": "gemv.order: item 0 takes a place past the active ones when it is inactive", "disposition": "solved"},
+    {"constraint": "gemv.order: items 0 and 1 keep index order while both are inactive (symmetry)", "disposition": "solved"},
+    {"constraint": "gemv.order: item 1 takes one of the first (number active) places when it is active", "disposition": "solved"},
+    {"constraint": "gemv.order: item 1 takes a place past the active ones when it is inactive", "disposition": "solved"}
+  ],
+  "params": [
+    {"name": "dpus", "doc": "number of DPUs the workgroup spans (ATiM: product of blockIdx extents)", "cardinality": 1985, "num_values": 1985, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "range", "lo": 64, "hi": 2048, "step": 1},
+    {"name": "tasklets", "doc": "tasklets per DPU (ATiM: threadIdx extent)", "cardinality": 16, "num_values": 16, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "range", "lo": 1, "hi": 16, "step": 1},
+    {"name": "gemv.M.mram", "doc": "mram tile size of iteration dim M (extent 4096) of cinm.op.gemv; per LEAF -- across all dims, prod(extent/tile) == dpus*tasklets, so one such tile per (dpu, tasklet) worker, not per DPU; must divide the extent", "cardinality": 13, "num_values": 13, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "values", "values": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]},
+    {"name": "gemv.M.wram", "doc": "wram tile size of iteration dim M (extent 4096) of cinm.op.gemv; must divide the previous level's tile", "cardinality": 4096, "num_values": 4096, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "range", "lo": 1, "hi": 4096, "step": 1},
+    {"name": "gemv.K.mram", "doc": "mram tile size of iteration dim K (extent 4096) of cinm.op.gemv; per LEAF -- across all dims, prod(extent/tile) == dpus*tasklets, so one such tile per (dpu, tasklet) worker, not per DPU; must divide the extent", "cardinality": 13, "num_values": 13, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "values", "values": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]},
+    {"name": "gemv.K.wram", "doc": "wram tile size of iteration dim K (extent 4096) of cinm.op.gemv; must divide the previous level's tile", "cardinality": 4096, "num_values": 4096, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "range", "lo": 1, "hi": 4096, "step": 1},
+    {"name": "gemv.order", "doc": "which iteration dim occupies which workgroup axis (cnm.workgroup_dim_order). An item is active only when its dim is actually distributed (extent / mram tile > 1); see the encoding note", "cardinality": 2, "num_values": 2, "arity": 2, "kind": "permutation", "dims": ["gemv.order[0]", "gemv.order[1]"], "items": ["M", "K"], "encoding": "dimension k holds the 1-based place of item k; place 1 is the outermost workgroup axis (slowest-varying across leaves, cnm.workgroup_dim_order position 0). Items declared conditionally active take the low places when active; inactive items are forced to the remaining high places in item-index order.", "orderings": [
+      {"order": "M>K", "assignment": {"gemv.order[0]": 1, "gemv.order[1]": 2}},
+      {"order": "K>M", "assignment": {"gemv.order[0]": 2, "gemv.order[1]": 1}}
+    ], "type": "range", "lo": 1, "hi": 2, "step": 1}
+  ]
+}
