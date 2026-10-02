@@ -225,9 +225,7 @@ class CostReport:
 def eval_solution(mlir: Path, config: Mapping[str, object]) -> CostReport:
     """Simulate one named configuration and report its cost breakdown."""
     solution = ",".join(f"{k}={v}" for k, v in config.items())
-    r = run(
-        mlir, WORK / "eval", show_progress=False, eval_solution=solution
-    )
+    r = run(mlir, WORK / "eval", show_progress=False, eval_solution=solution)
     text = r.stdout + r.stderr
     m = re.search(r"Estimated cost:\s*([0-9.]+)\s*ms", text)
     if not m:
@@ -323,11 +321,15 @@ def params_table(space: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def describe_space(space: dict) -> str:
+def describe_space(space: dict, feasible=False) -> str:
     cart = space["cartesian_size"]
     feas = space["feasible_size"]
+
+    res = f"Cartesian product: {cart:,.0f} combinations"
+    if not feasible:
+        return res
     return (
-        f"Cartesian product: {cart:,.0f} combinations\n"
+        f"{res}\n"
         f"Feasible:          {feas:,} configurations "
         f"({100 * feas / cart:.2g} %)\n"
         f"Built in {space['space_build_seconds']:.2f} s "

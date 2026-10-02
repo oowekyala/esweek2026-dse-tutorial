@@ -6,7 +6,7 @@ using Cinnamon's accelerator-inference pass as the running example.
 ```
 slides/        Beamer deck; `make` in there builds slides/dse-tutorial.pdf
                figures/_make.py redraws its figures from data/ (oracles and seed sweeps)
-notebooks/     01_space  02_landscape  03_search  (+ _generate.py, their source)
+notebooks/     01_space  02_landscape  03_search
 dse/           what the notebooks import: running cinm-opt, reading its dumps, plots, the picker
 data/          the kernels and the precomputed oracles
   small/       1024² gemv, 64 DPUs — 3234 feasible configurations, exhaustively simulated
@@ -14,23 +14,33 @@ data/          the kernels and the precomputed oracles
   large/       2048² gemm, ≤2048 DPUs — 2.8 million feasible; space only, no oracle
   sweeps/      the BO seed sweeps the slides quote: 40×10 and 100×5 on small, 100×5 on big
 binder/        the Dockerfile mybinder.org builds
+scripts/       check-notebooks.sh, behind `pixi run check`
 work/          everything the notebooks write; not tracked
 ```
 
-## Running the notebooks
+## Working on the tutorial
 
-They need `cinm-opt` and Cinnamon's Python environment. From a Cinnamon checkout
-that has been built:
+The repository has a pixi environment of its own: Jupyter, the notebooks'
+dependencies, and the `dse` package installed editable.
 
 ```sh
-cd /path/to/cinm-mlir
-pixi run -e host jupyter notebook --notebook-dir=/path/to/esweek2026-tutorial/notebooks
+pixi install
+pixi run notebook     # Jupyter, rooted at notebooks/
+pixi run check        # executes the three notebooks in order on one core, timing each
+pixi run clean-notebooks  # strips outputs before a commit
+pixi run figures      # redraws slides/figures from data/
+pixi run slides       # builds slides/dse-tutorial.pdf (system TeX Live)
 ```
 
-`pixi run` puts `build/bin` on `PATH`, which is where the notebooks find
-`cinm-opt`; `CINM_OPT=/path/to/cinm-opt` names one explicitly. Use the
-environment the compiler was built in (`host` for a system-compiler build,
-default for the pixi toolchain).
+In an editor, choose `.pixi/envs/default/bin/python` as the notebook kernel;
+after editing anything under `dse/`, restart the kernel.
+
+`cinm-opt` is not part of the environment. The notebooks take it from
+`CINM_OPT`, then from `PATH`, then from a Cinnamon checkout beside this
+repository (`../cinm-mlir`, `../Cinnamon`, or `../../MLIR/cinm-mlir`), and only
+accept a binary that answers `--version` -- an old Cinnamon wheel can leave a
+`cinm-opt` on `PATH` whose libraries are gone. The tutorial image has it on
+`PATH`.
 
 Every search the notebooks run is pinned to one core and the fast simulator,
 the conditions of a Binder session. Timings on a laptop:

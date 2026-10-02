@@ -14,8 +14,6 @@ platforms = ["linux-64", "osx-arm64"]
 [dependencies]
 # What the Cinnamon environment ships; the image runs the notebooks on that.
 python = "3.12.*"
-# The slides
-texlive-core = "*"
 
 [pypi-dependencies]
 dse = { path = ".", editable = true }
@@ -25,10 +23,12 @@ nbformat = "*"
 
 [tasks]
 notebook = "jupyter notebook --notebook-dir=notebooks"
-# The notebooks are generated from notebooks/_generate.py
-generate = "python notebooks/_generate.py"
+# Outputs stay out of the repository; run before committing a notebook
+clean-notebooks = "jupyter nbconvert --clear-output --inplace notebooks/*.ipynb"
 # The slides' figures, from the oracles and sweeps under data/
 figures = "python slides/figures/_make.py"
-slides = { cmd = "latexmk -pdf -interaction=nonstopmode -halt-on-error dse-tutorial.tex", cwd = "slides", depends-on = ["figures"] }
+# The deck, with the system's TeX Live: it needs metropolis, tikz, booktabs
+# and fontawesome5, which conda's texlive-core does not carry.
+slides = { cmd = "make", cwd = "slides", depends-on = ["figures"] }
 # Executes the three notebooks in order on one core, as a Binder session would
 check = { cmd = "bash scripts/check-notebooks.sh" }
