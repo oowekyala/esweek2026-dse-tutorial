@@ -25,11 +25,11 @@
     \vspace{1.2em}\footnotesize\color{cgrid}#3
   \end{frame}}
 
-\title{Finding a needle in $4\times10^{9}$ configurations}
+\title{Finding a needle in $6\times10^{9}$ configurations}
 \subtitle{Design-space exploration for compute-near-memory systems}
-\author{Clément Fournier}
+\author{\underline{Clément Fournier}, João P. C. de Lima, Asif Ali Khan, Jerónimo Castrillón}
 \institute{TU Dresden}
-\date{ESWEEK 2026}
+\date{ESWEEK 2026 tutorial}
 
 \begin{document}
 
@@ -81,6 +81,7 @@
 \end{frame}
 
 \begin{frame}{What they have in common}
+  % Comparison table CNM/CIM
   \begin{columns}[T]
     \column{.5\textwidth}
     \begin{itemize}
@@ -171,7 +172,7 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
     \end{itemize}
   \end{columns}
   \bigskip
-  \centering\small Every arrow in the picture is a parameter; every ``must'' is a constraint.
+  % \centering\small Every arrow in the picture is a parameter; every ``must'' is a constraint.
 \end{frame}
 
 \begin{frame}{The hardware knobs are not separate}

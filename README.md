@@ -58,17 +58,26 @@ the conditions of a Binder session. Timings on a laptop:
 
 Binder's cores are slower; budget two to three times these.
 
-## Regenerating the oracles
+## Regenerating the data
 
-The pools in `data/` came from
+`dodo.py` holds the whole chain: the kernels and `cinm-opt` → spaces, oracles
+and seed sweeps under `data/` → the slides' figures → the deck. Each task
+depends on exactly the files it reads, so doit reruns only what is stale.
 
 ```sh
-cinm-opt data/small/gemv.mlir --cinm-isolate-compute-blocks \
-  --upmem-infer-accelerator="exhaustive-search=1 dump-full-pool=1 simulator=fast dump-dir=out"
+pixi run doit list           # the tasks
+pixi run doit                # everything that is out of date
+pixi run doit sweep          # one group: space, oracle, sweep, figures, slides
+pixi run doit oracle:big     # one task
 ```
 
-and the same for `data/big/gemv.mlir` (with `n-workers` at the machine's core
-count: it is 26k simulations). `dump-space-only=1` writes `space.json` alone.
+`cinm-opt` is a dependency of every run: rebuilding Cinnamon makes all of them
+stale (`doit ignore` keeps one as it is). The big oracle dominates — 26k
+simulations, about 7 minutes on 14 cores; `JOBS` sets the thread count, all
+cores by default. A search visits the same configurations whatever the thread
+count, so the sweeps are what a one-core Binder kernel would produce with the
+same seeds. The seed tables on the slides are written into
+`slides/dse-tutorial.tex` by hand.
 
 ## Binder
 

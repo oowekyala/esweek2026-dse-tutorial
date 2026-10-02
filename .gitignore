@@ -12,3 +12,9 @@ slides/*.fls
 slides/*.fdb_latexmk
 slides/*.synctex.gz
 .pixi/
+
+.ipython
+.jupyter
+.cache
+.doit.db*
+

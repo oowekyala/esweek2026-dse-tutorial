@@ -2,7 +2,7 @@
   "cartesian_size": 1.80101e+14,
   "feasible_size": 26238,
   "space_feasible_density": 1.45685e-10,
-  "space_build_seconds": 0.0552808,
+  "space_build_seconds": 0.231564,
   "solver": {"cartesian": 1.80101e+14, "solutions": 26238, "nodes": 52741, "failures": 133, "complete": true},
   "constraints": [
     {"constraint": "4096 % gemv.M.mram == 0", "disposition": "static-filter"},

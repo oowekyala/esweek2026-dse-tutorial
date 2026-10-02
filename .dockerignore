@@ -1,0 +1,11 @@
+# What binder/Dockerfile copies into the image: the tutorial, not the local environment
+.pixi
+work
+.git
+__pycache__
+notebooks/.ipynb_checkpoints
+slides/*.aux
+slides/*.log
+slides/*.fdb_latexmk
+slides/*.fls
+slides/*.synctex.gz

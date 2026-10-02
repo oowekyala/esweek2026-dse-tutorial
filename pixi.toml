@@ -20,15 +20,16 @@ dse = { path = ".", editable = true }
 notebook = "*"
 # Stripping outputs before committing a notebook
 nbformat = "*"
+doit = { path = "doit", editable = true }
 
 [tasks]
 notebook = "jupyter notebook --notebook-dir=notebooks"
 # Outputs stay out of the repository; run before committing a notebook
 clean-notebooks = "jupyter nbconvert --clear-output --inplace notebooks/*.ipynb"
-# The slides' figures, from the oracles and sweeps under data/
-figures = "python slides/figures/_make.py"
-# The deck, with the system's TeX Live: it needs metropolis, tikz, booktabs
-# and fontawesome5, which conda's texlive-core does not carry.
-slides = { cmd = "make", cwd = "slides", depends-on = ["figures"] }
+# data/, the slides' figures and the deck, through dodo.py: `pixi run doit list`
+# for the tasks, `pixi run doit sweep` or `pixi run doit oracle:big` for some.
+# The deck needs the system's TeX Live (metropolis, tikz, fontawesome5).
+figures = "doit figures"
+slides = "doit slides"
 # Executes the three notebooks in order on one core, as a Binder session would
 check = { cmd = "bash scripts/check-notebooks.sh" }

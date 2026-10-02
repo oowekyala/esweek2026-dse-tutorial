@@ -1,9 +1,9 @@
 {
-  "cartesian_size": 4.06009e+09,
+  "cartesian_size": 6.09013e+09,
   "feasible_size": 3234,
-  "space_feasible_density": 7.96535e-07,
-  "space_build_seconds": 0.0104903,
-  "solver": {"cartesian": 4.06009e+09, "solutions": 3234, "nodes": 6483, "failures": 8, "complete": true},
+  "space_feasible_density": 5.31023e-07,
+  "space_build_seconds": 0.0462608,
+  "solver": {"cartesian": 6.09013e+09, "solutions": 3234, "nodes": 6491, "failures": 12, "complete": true},
   "constraints": [
     {"constraint": "1024 % gemv.M.mram == 0", "disposition": "static-filter"},
     {"constraint": "1024 % gemv.K.mram == 0", "disposition": "static-filter"},
@@ -25,7 +25,7 @@
   ],
   "params": [
     {"name": "dpus", "doc": "number of DPUs the workgroup spans (ATiM: product of blockIdx extents)", "cardinality": 1, "num_values": 1, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "range", "lo": 64, "hi": 64, "step": 1},
-    {"name": "tasklets", "doc": "tasklets per DPU (ATiM: threadIdx extent)", "cardinality": 16, "num_values": 16, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "range", "lo": 1, "hi": 16, "step": 1},
+    {"name": "tasklets", "doc": "tasklets per DPU (ATiM: threadIdx extent)", "cardinality": 24, "num_values": 24, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "range", "lo": 1, "hi": 24, "step": 1},
     {"name": "gemv.M.mram", "doc": "mram tile size of iteration dim M (extent 1024) of cinm.op.gemv; per LEAF -- across all dims, prod(extent/tile) == dpus*tasklets, so one such tile per (dpu, tasklet) worker, not per DPU; must divide the extent", "cardinality": 11, "num_values": 11, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "values", "values": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]},
     {"name": "gemv.M.wram", "doc": "wram tile size of iteration dim M (extent 1024) of cinm.op.gemv; must divide the previous level's tile", "cardinality": 1024, "num_values": 1024, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "range", "lo": 1, "hi": 1024, "step": 1},
     {"name": "gemv.K.mram", "doc": "mram tile size of iteration dim K (extent 1024) of cinm.op.gemv; per LEAF -- across all dims, prod(extent/tile) == dpus*tasklets, so one such tile per (dpu, tasklet) worker, not per DPU; must divide the extent", "cardinality": 11, "num_values": 11, "arity": 1, "kind": "integer", "spacing": "multiplicative", "type": "values", "values": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]},

@@ -1,0 +1,4 @@
+[submodule "doit"]
+	path = doit
+	url = git@github.com:oowekyala/doit.git
+	branch = deep-subtasks
