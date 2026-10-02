@@ -218,7 +218,6 @@ def task_sweep():
 
 FIGURE_FILES = [
     "histogram.pdf",
-    "marginals.pdf",
     "seeds_small_40.pdf",
     "seeds_small_100.pdf",
     "seeds_big_100.pdf",

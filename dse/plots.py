@@ -12,7 +12,7 @@ from typing import Mapping, Sequence
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import LinearSegmentedColormap, LogNorm
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
 
 from .cinm import param_columns, visited
@@ -101,68 +101,6 @@ def cost_histogram(
                 va="top",
                 bbox=dict(boxstyle="round,pad=0.15", facecolor="white", edgecolor="none", alpha=0.85),
             )
-    return ax
-
-
-def marginals(
-    oracle: pd.DataFrame,
-    params: Sequence[str] | None = None,
-    ncols: int = 3,
-):
-    """Per parameter: best and median cost at each of its values.
-
-    A parameter whose best line moves a lot is one the search has to get
-    right; one whose lines are flat can be set almost anywhere.
-    """
-    params = list(params or param_columns(oracle))
-    nrows = int(np.ceil(len(params) / ncols))
-    fig, axes = plt.subplots(nrows, ncols, figsize=(3.1 * ncols, 2.6 * nrows), squeeze=False)
-    for ax, p in zip(axes.flat, params):
-        g = oracle.groupby(p)["cost"].agg(best="min", median="median", n="count").reset_index()
-        x = np.arange(len(g))
-        ax.plot(x, g["median"], color=INK_2, marker="o", markersize=4, linewidth=1.4, label="median")
-        ax.plot(x, g["best"], color=BLUE, marker="o", markersize=4, linewidth=2, label="best")
-        ax.set_xticks(x)
-        ax.set_xticklabels([str(v) for v in g[p]], rotation=45 if len(g) > 6 else 0, fontsize=8)
-        ax.set_yscale("log")
-        _ms_log_axis(ax.yaxis)
-        ax.set_title(p, loc="left", fontsize=10, color=INK)
-        ax.set_ylim(oracle["cost"].min() * 0.8, oracle["cost"].max() * 1.2)
-    for ax in axes.flat[len(params):]:
-        ax.set_visible(False)
-    axes[0, 0].legend(loc="upper right", fontsize=8)
-    fig.supylabel("latency [ms], log scale", fontsize=9, color=INK_2)
-    fig.tight_layout()
-    return fig
-
-
-def heatmap(
-    oracle: pd.DataFrame,
-    x: str,
-    y: str,
-    stat: str = "min",
-    ax=None,
-):
-    """Best (or median) cost over two parameters, every other one free."""
-    table = oracle.pivot_table(index=y, columns=x, values="cost", aggfunc=stat)
-    if ax is None:
-        _, ax = plt.subplots(figsize=(0.55 * table.shape[1] + 2.5, 0.45 * table.shape[0] + 1.5))
-    im = ax.imshow(
-        table.to_numpy(),
-        cmap=BLUES.reversed(),
-        norm=LogNorm(vmin=np.nanmin(table.to_numpy()), vmax=np.nanmax(table.to_numpy())),
-        aspect="auto",
-    )
-    ax.set_xticks(range(table.shape[1]))
-    ax.set_xticklabels([str(c) for c in table.columns], fontsize=8)
-    ax.set_yticks(range(table.shape[0]))
-    ax.set_yticklabels([str(i) for i in table.index], fontsize=8)
-    ax.set_xlabel(x)
-    ax.set_ylabel(y)
-    ax.grid(False)
-    ax.set_title(f"{stat} latency [ms] — darker is faster", loc="left", fontsize=10, color=INK)
-    cb = plt.colorbar(im, ax=ax, fraction=0.04, pad=0.03)
-    cb.outline.set_visible(False)
     return ax
 
 

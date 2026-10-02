@@ -51,14 +51,6 @@ def main():
         ),
         "histogram.pdf",
     )
-    save(
-        plots.marginals(
-            small,
-            ["tasklets", "gemv.M.mram", "gemv.K.mram", "gemv.M.wram", "gemv.K.wram", "gemv.order[0]"],
-        ),
-        "marginals.pdf",
-    )
-
     base_small = dse.random_search_baseline(small, budget=100)
     ax = plots.seeds_spread(sweep("small_40x10"), oracle_best=small["cost"].min(), baseline=base_small[:, :40])
     ax.set_title("3234 configurations, budget 40 — ten seeds", loc="left")

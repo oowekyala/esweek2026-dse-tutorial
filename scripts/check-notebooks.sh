@@ -14,7 +14,7 @@ if command -v taskset >/dev/null 2>&1; then
 fi
 
 status=0
-for nb in 01_space 02_landscape 03_search; do
+for nb in 01_space 02_evaluate 03_search; do
   start=$(date +%s)
   if MPLBACKEND=Agg "${pin[@]}" jupyter nbconvert --to notebook --execute \
        --ExecutePreprocessor.timeout=900 --output-dir="$out" \

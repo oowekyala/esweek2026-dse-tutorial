@@ -10,6 +10,7 @@ the constraints that carved the feasible set out of the Cartesian product.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -109,13 +110,15 @@ def run(
     out_dir: Path,
     *,
     show_progress: bool = True,
+    output: Path | None = None,
     **options: object,
 ) -> Run:
     """Run cinm-opt with --upmem-infer-accelerator on ``mlir``, dumping to ``out_dir``.
 
     ``options`` are the pass's own options, e.g. ``max_evals=40`` becomes
     ``max-evals=40``. The dump directory is cleared first, so a re-run of a
-    cell never mixes with the previous run's files.
+    cell never mixes with the previous run's files. ``output`` receives the
+    IR cinm-opt writes out; it is discarded otherwise.
     """
     out_dir = Path(out_dir)
     if out_dir.exists():
@@ -132,7 +135,7 @@ def run(
         "--cinm-isolate-compute-blocks",
         f"--upmem-infer-accelerator={_format_options(opts)}",
         "-o",
-        "/dev/null",
+        str(output) if output else os.devnull,
     ]
 
     start = time.perf_counter()
@@ -222,11 +225,7 @@ class CostReport:
         )
 
 
-def eval_solution(mlir: Path, config: Mapping[str, object]) -> CostReport:
-    """Simulate one named configuration and report its cost breakdown."""
-    solution = ",".join(f"{k}={v}" for k, v in config.items())
-    r = run(mlir, WORK / "eval", show_progress=False, eval_solution=solution)
-    text = r.stdout + r.stderr
+def _cost_report(text: str, config: Mapping[str, object]) -> CostReport:
     m = re.search(r"Estimated cost:\s*([0-9.]+)\s*ms", text)
     if not m:
         raise RuntimeError(f"no cost in cinm-opt's output:\n{text}")
@@ -235,6 +234,55 @@ def eval_solution(mlir: Path, config: Mapping[str, object]) -> CostReport:
         for k, v in re.findall(r"^\s+([\w.]+):\s*([0-9.]+)\s*ms", text, re.M)
     }
     return CostReport(float(m.group(1)), breakdown, dict(config))
+
+
+def eval_solution(mlir: Path, config: Mapping[str, object]) -> CostReport:
+    """Simulate one named configuration and report its cost breakdown."""
+    solution = ",".join(f"{k}={v}" for k, v in config.items())
+    r = run(mlir, WORK / "eval", show_progress=False, eval_solution=solution)
+    return _cost_report(r.stdout + r.stderr, config)
+
+
+@dataclass
+class Lowering:
+    """One configuration taken through the lowering, and its estimated cost.
+
+    ``stages`` maps the name of each point in the pipeline where the pass
+    printed the IR (``after-linalg-to-cnm`` and so on) to that IR; ``output``
+    is the program the pass finally commits.
+    """
+
+    config: dict[str, object]
+    stages: dict[str, str]
+    output: str
+    report: CostReport
+
+    def _repr_html_(self) -> str:
+        return self.report._repr_html_()
+
+
+_STAGE = re.compile(r"^// -----// IR Dump (\S+) //----- //\n", re.M)
+
+
+def lower(mlir: Path, config: Mapping[str, object]) -> Lowering:
+    """Lower ``mlir`` with one configuration, keeping the IR of every stage."""
+    solution = ",".join(f"{k}={v}" for k, v in config.items())
+    out = WORK / "lowered.mlir"
+    r = run(
+        mlir,
+        WORK / "lower",
+        show_progress=False,
+        output=out,
+        eval_solution=solution,
+        debug_pipeline=True,
+    )
+    text = r.stdout + r.stderr
+    parts = _STAGE.split(text)
+    stages = {}
+    for name, body in zip(parts[1::2], parts[2::2]):
+        # The last dump runs on into the cost report
+        stages[name] = body.split("Estimated cost:")[0].rstrip() + "\n"
+    return Lowering(dict(config), stages, out.read_text(), _cost_report(text, config))
 
 
 # ---------------------------------------------------------------------------
