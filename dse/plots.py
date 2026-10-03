@@ -65,6 +65,17 @@ def _log_bins(costs: np.ndarray, n: int = 40) -> np.ndarray:
     return np.logspace(np.log10(lo) - 0.02, np.log10(hi) + 0.02, n)
 
 
+def _running_best(pool: pd.DataFrame) -> np.ndarray:
+    """Best cost seen after each evaluation that produced one, in order.
+
+    Evaluations that failed are left out entirely, so the x axis counts the
+    evaluations that make up the search's budget (``max-evals`` does not count
+    failures).
+    """
+    cost = visited(pool)["cost"].to_numpy(dtype=float)
+    return np.minimum.accumulate(cost[~np.isnan(cost)])
+
+
 def cost_histogram(
     oracle: pd.DataFrame,
     marks: Mapping[str, float] | None = None,
@@ -125,8 +136,8 @@ def best_so_far(
         ax.fill_between(xs, lo, hi, color=INK_2, alpha=0.12, linewidth=0)
         ax.plot(xs, mid, color=INK_2, linewidth=1.4, linestyle="--", label="random search (median, IQR)")
     for (label, pool), colour in zip(runs.items(), SERIES):
-        v = visited(pool)
-        ax.plot(np.arange(1, len(v) + 1), v["cost"].cummin(), color=colour, linewidth=2, label=label)
+        best = _running_best(pool)
+        ax.plot(np.arange(1, len(best) + 1), best, color=colour, linewidth=2, label=label)
     if oracle_best is not None:
         ax.axhline(oracle_best, color=INK, linewidth=1, linestyle=":")
         ax.annotate("optimum (exhaustive)", (ax.get_xlim()[1], oracle_best), xytext=(-4, 4),
@@ -159,8 +170,7 @@ def seeds_spread(
                 label="random search (median)")
     curves = []
     for seed, pool in sorted(pools.items()):
-        v = visited(pool)
-        c = v["cost"].cummin().to_numpy()
+        c = _running_best(pool)
         curves.append(c)
         ax.plot(np.arange(1, len(c) + 1), c, color=BLUE, linewidth=1, alpha=0.45)
     n = min(len(c) for c in curves)
