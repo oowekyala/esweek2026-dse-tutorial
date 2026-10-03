@@ -201,6 +201,7 @@ def bo(
     opts: dict[str, object] = {
         "max_evals": max_evals,
         "n_init": n_init,
+        "acquisition": "lcb",
     }
     if seeds > 1:
         opts["n_seeds"] = seeds
