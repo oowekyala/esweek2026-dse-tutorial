@@ -1,11 +1,15 @@
 % Design-space exploration for compute-near-memory systems -- ESWEEK 2026 tutorial
 % Build: make   (latexmk -pdf)
-\documentclass[aspectratio=169,10pt]{beamer}
-\usetheme{metropolis}
+\documentclass[aspectratio=169,11pt]{ccc-beamer}
+% \usetheme{ccc-beamer}
 \usepackage{booktabs}
 \usepackage{tikz}
 \usetikzlibrary{positioning,fit,arrows.meta,calc}
 \usepackage{fontawesome5}
+% ccc-beamer loads enumitem, whose enumerate labels loop forever under beamer
+% unless they are set explicitly.
+\setlist[enumerate]{label=\arabic*.}
+
 
 % The palette the notebooks draw with
 \definecolor{cblue}{HTML}{2a78d6}
@@ -14,20 +18,31 @@
 \definecolor{cink}{HTML}{0b0b0b}
 \definecolor{cink2}{HTML}{52514e}
 \definecolor{cgrid}{HTML}{e3e2dd}
-\setbeamercolor{progress bar}{fg=cblue}
 \setbeamercolor{alerted text}{fg=corange}
-\setbeamercolor{title separator}{fg=cblue}
 
+% A divider in ccc-beamer's section-page style: title and subtitle on the blue
+% side, what to do in the notebook on the white side.
 \newcommand{\notebookframe}[3]{%
-  \begin{frame}[standout]
-    \Huge Notebook #1\par
-    \vspace{.6em}\normalsize #2\par
-    \vspace{1.2em}\footnotesize\color{cgrid}#3
+  \begin{frame}[sectionpage]{Notebook #1}
+    \framesubtitle{#2}
+    \begin{columns}
+      \column{.66\textwidth}
+      \column{.3\textwidth}
+      \small #3
+    \end{columns}
   \end{frame}}
 
-\title{Finding a needle in $6\times10^{9}$ configurations}
-\subtitle{Design-space exploration for compute-near-memory systems}
-\author{\underline{Clément Fournier}, João P. C. de Lima, Asif Ali Khan, Jerónimo Castrillón}
+% A section with its divider slide. The line break before \end{frame} matters:
+% with an empty body, ccc-beamer's section page loses its title, which beamer
+% then typesets as plain body text.
+\newcommand{\sectionframe}[1]{%
+  \section{#1}
+  \begin{frame}[sectionpage]{#1}
+  \end{frame}}
+
+\title[Design-Space Exploration for CNM]{Cinnamon for Design-Space Exploration}
+\subtitle{Design-Space Exploration For Compute-Near-Memory Systems}
+\author[Fournier, de Lima, Khan, Farzaneh, Castrillón]{\underline{Clément Fournier}, João P. C. de Lima, Asif Ali Khan, Hamid Farzaneh, Jerónimo Castrillón}
 \institute{TU Dresden}
 \date{ESWEEK 2026 tutorial}
 
@@ -39,76 +54,73 @@
 \begin{frame}{Today}
   \begin{columns}[T]
     \column{.55\textwidth}
-    Each configuration takes a simulation to evaluate, and there are far too many to try them all. How do we find a good one?
+    The space of possible programs is too large to enumerate.
+    
+    How do we find a good one?
     \bigskip
+    \pause
     \begin{enumerate}
       \item The design space \hfill\small notebook 1
       \item Evaluating a configuration \hfill\small notebook 2
       \item Searching the space \hfill\small notebook 3
     \end{enumerate}
+    \pause
     \column{.4\textwidth}
     \begin{block}{Open the notebooks now}
       \centering
-      \fbox{\parbox{.85\linewidth}{\centering\vspace{2.2em}Binder QR / link\vspace{2.2em}}}\par
+      \includegraphics[width=.55\linewidth]{figures/tuto-dse-qr.png}\par
+      \small\url{https://tinyurl.com/tuto-dse}\par
       \smallskip\footnotesize Binder takes a minute or two to start.
     \end{block}
   \end{columns}
 \end{frame}
 
 % ─────────────────────────────────────────────────────────────────────────
-\section{The hardware}
+\sectionframe{The hardware}
 
-\begin{frame}{Compute near memory, four ways}
-  \begin{columns}[T]
-    \column{.24\textwidth}\centering
-    \fbox{\parbox{.9\linewidth}{\centering\vspace{3em}UPMEM\vspace{3em}}}\par
+\begin{frame}{Compute near memory}
+  \begin{columns}[c]
+    \column{.2\textwidth}
+    \textbf{UPMEM}\par
     \small DPUs in DRAM ranks
-    \column{.24\textwidth}\centering
-    \fbox{\parbox{.9\linewidth}{\centering\vspace{3em}HBM-PIM\vspace{3em}}}\par
-    \small SIMD units per bank
-    \column{.24\textwidth}\centering
-    \fbox{\parbox{.9\linewidth}{\centering\vspace{3em}SIMDRAM\vspace{3em}}}\par
-    \small compute in the cell array
-    \column{.24\textwidth}\centering
-    \fbox{\parbox{.9\linewidth}{\centering\vspace{3em}UniNDP\vspace{3em}}}\par
-    \small the design space of all of them
+    \column{.78\textwidth}
+    \includegraphics[width=\linewidth,height=.36\textheight,keepaspectratio]{figures/upmem.png}
   \end{columns}
-  \bigskip
-  \footnotesize Figures: UPMEM (Devaux, HotChips'19), Samsung HBM-PIM (Lee et al., ISCA'21), SIMDRAM (Hajinazar et al., ASPLOS'21), UniNDP (Li et al., HPCA'25).
+  \medskip
+  \begin{columns}[c]
+    \column{.2\textwidth}
+    \textbf{HBM-PIM}\par
+    \small SIMD units per bank
+    \column{.78\textwidth}
+    \includegraphics[width=\linewidth,height=.36\textheight,keepaspectratio]{figures/hbmpim.png}
+  \end{columns}
+  \vfill
+  \footnotesize Figures: Khan et al., 2024.
 \end{frame}
 
 \begin{frame}{What they have in common}
   \begin{columns}[T]
     \column{.5\textwidth}
     \begin{itemize}
-      \item \textbf{Many small compute nodes}: thousands, each slow on its own
-      \item \textbf{Each owns a slice of memory}: fast to reach locally, slow or impossible across
-      \item \textbf{A hierarchy of levels}: bank / rank / channel; node-local scratchpad
-      \item \textbf{A narrow interface to the host}: data goes in and out through it
-      \item \textbf{Programmable}: what runs where is a software decision
+      \item \textbf{Many small compute nodes}
+      \item \textbf{Each owns a slice of memory}
+      \item \textbf{A hierarchy of levels}
+      \item \textbf{A narrow interface to other memory spaces}
+      \item \textbf{Programmable}
     \end{itemize}
     \column{.48\textwidth}
-    \begin{tikzpicture}[scale=.8, every node/.style={font=\scriptsize}]
-      \node[draw, rounded corners, minimum width=5.2cm, minimum height=.7cm, fill=cgrid] (host) {host CPU};
-      \node[below=.9cm of host, draw, minimum width=5.2cm, minimum height=.35cm, fill=cblue!20] (bus) {memory interface};
-      \draw[-{Latex}, thick] (host) -- (bus);
-      \foreach \i in {0,...,7} {
-        \node[below=.6cm of bus.south west, anchor=north west, xshift={\i*.65cm}, draw, minimum width=.55cm, minimum height=1.6cm, fill=white] (n\i) {};
-        \node[anchor=north] at ([yshift=-.05cm]n\i.north) {\tiny node};
-        \node[anchor=south, draw, fill=cblue!40, minimum width=.45cm, minimum height=.9cm] at ([yshift=.05cm]n\i.south) {\tiny mem};
-        \draw (bus.south -| n\i) -- (n\i.north);
-      }
-      \node[below=.15cm of n3.south east, font=\scriptsize\color{cink2}] {one of many ranks / channels / stacks};
-    \end{tikzpicture}
+    \includegraphics[width=\linewidth]{figures/unindp.png}
   \end{columns}
   \bigskip
   Running a kernel on such a system means deciding how to distribute it over the nodes and memories.
+  \vfill
+  \footnotesize Figure: Xie et al., HPCA 2025.
 \end{frame}
 
 % ─────────────────────────────────────────────────────────────────────────
-\section{The problem}
+\sectionframe{The problem}
 
-\begin{frame}[fragile]{Our running example: $y = A x$}
+\begin{frame}[fragile]{Running example: $y = A x$}
   \begin{columns}[T]
     \column{.5\textwidth}
     \begin{align*}
@@ -121,9 +133,10 @@
       \item $M$ is \textbf{parallel}: rows are independent
       \item $K$ is a \textbf{reduction}: splitting it produces partial sums that must be added up
     \end{itemize}
+    \pause
     \column{.46\textwidth}
     \small In Cinnamon's MLIR input:
-    \begin{semiverbatim}\scriptsize
+    \begin{semiverbatim}\tiny
 #upmem = #upmem.platform<type = v1A,
                           dpus = 64, tasklets = 24>
 
@@ -131,44 +144,107 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
                 \%x: tensor<1024xi32>)
     attributes \{cinm.available_platforms = [#upmem]\} \{
   cinm.compute \{
-    cinm.op.gemv \%A, \%x
+    \%y = cinm.op.gemv \%A, \%x
   \}
 \}
     \end{semiverbatim}
-    \footnotesize One DRAM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
+    % \footnotesize One DRAM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
   \end{columns}
 \end{frame}
 
 \begin{frame}{Tiling to the memory levels}
   \begin{columns}[T]
-    \column{.5\textwidth}
-    \centering
-    \begin{tikzpicture}[scale=.95, every node/.style={font=\scriptsize}]
-      \draw[fill=cgrid] (0,0) rectangle (3.2,3.2);
-      \node[anchor=south] at (1.6,3.25) {$A$: $1024 \times 1024$};
-      \foreach \i in {1,...,7} \draw[cblue, thick] (0,\i*0.4) -- (3.2,\i*0.4);
-      \draw[cblue, very thick, fill=cblue!25] (0,2.0) rectangle (3.2,2.4);
-      \draw[corange, very thick, fill=corange!40] (0.4,2.0) rectangle (0.9,2.4);
-      % labels, stacked to the right of the matrix
-      \node[anchor=west, cblue, align=left] at (3.5,2.2) {\textbf{MRAM tile}, one per worker\\ $\texttt{M.mram} \times \texttt{K.mram}$};
-      \draw[cblue] (3.2,2.2) -- (3.5,2.2);
-      \node[anchor=west, corange, align=left] at (3.5,1.2) {\textbf{WRAM tile}, streamed\\ $\texttt{M.wram} \times \texttt{K.wram}$};
-      \draw[corange] (0.65,2.0) .. controls (1.2,1.2) .. (3.5,1.2);
-      \node[anchor=west, cink2, align=left] at (3.5,0.3) {\texttt{order}: which dimension\\ is spread across DPUs first};
+    \column{.42\textwidth}
+    \begin{tikzpicture}[every node/.style={font=\scriptsize}]
+      % ── Sizes, in cm. The tile sizes are drawing sizes, not the real ones.
+      \def\M{2.4}     % rows of A, entries of y
+      \def\K{2.4}     % columns of A, entries of x
+      \def\tm{0.6}    % MRAM tile: rows    (M.mram)
+      \def\tk{1.2}    % MRAM tile: columns (K.mram)
+      \def\wm{0.3}    % WRAM tile: rows    (M.wram)
+      \def\wk{0.4}    % WRAM tile: columns (K.wram)
+      \def\ti{1}      % the highlighted MRAM tile: its row, from the top
+      \def\tj{0}      % and its column
+      \def\vw{0.28}   % width of the drawn vectors
+      \def\gap{0.45}  % space around the operators
+      % ── Derived positions
+      \pgfmathsetmacro\tx{\tj*\tk}              % left edge of the tile in A
+      \pgfmathsetmacro\ty{\M-\ti*\tm}           % top edge of the tile in A
+      \pgfmathsetmacro\xx{\K+2*\gap}            % left edge of x
+      \pgfmathsetmacro\xtop{\K-\tj*\tk}         % top of x's tile (x is drawn top to bottom)
+      \pgfmathsetmacro\yx{\xx+\vw+2*\gap}       % left edge of y
+      \pgfmathsetmacro\xoff{(\M-\K)/2}          % centres x vertically on A
+
+      % ── A: the MRAM tile grid, one MRAM tile, and a WRAM tile inside it
+      \fill[cgrid] (0,0) rectangle (\K,\M);
+      \draw[cblue!45, xstep=\tk, ystep=\tm] (0,0) grid (\K,\M);
+      \draw (0,0) rectangle (\K,\M);
+      \fill[cblue!30, draw=cblue, thick] (\tx,\ty-\tm) rectangle (\tx+\tk,\ty);
+      \fill[corange!50, draw=corange, thick] (\tx,\ty-\wm) rectangle (\tx+\wk,\ty);
+      \node[above] at (\K/2,\M) {$A$};
+      \node[font=\normalsize] at (\K+\gap,\M/2) {$\cdot$};
+
+      % ── x: the K.mram entries the tile multiplies, and the WRAM part of them
+      \begin{scope}[shift={(\xx,\xoff)}]
+        \fill[cgrid] (0,0) rectangle (\vw,\K);
+        \draw[cblue!45, ystep=\tk, xstep=\vw] (0,0) grid (\vw,\K);
+        \draw (0,0) rectangle (\vw,\K);
+        \fill[cblue!30, draw=cblue, thick] (0,\xtop-\tk) rectangle (\vw,\xtop);
+        \fill[corange!50, draw=corange, thick] (0,\xtop-\wk) rectangle (\vw,\xtop);
+        \node[above] at (\vw/2,\K) {$x$};
+      \end{scope}
+      \node[font=\normalsize] at (\xx+\vw+\gap,\M/2) {$=$};
+
+      % ── y: the M.mram entries the tile produces, and the WRAM part of them
+      \begin{scope}[shift={(\yx,0)}]
+        \fill[cgrid] (0,0) rectangle (\vw,\M);
+        \draw[cblue!45, ystep=\tm, xstep=\vw] (0,0) grid (\vw,\M);
+        \draw (0,0) rectangle (\vw,\M);
+        \fill[cblue!30, draw=cblue, thick] (0,\ty-\tm) rectangle (\vw,\ty);
+        \fill[corange!50, draw=corange, thick] (0,\ty-\wm) rectangle (\vw,\ty);
+        \node[above] at (\vw/2,\M) {$y$};
+      \end{scope}
+
+      % ── The device: a stack of DPUs, each with its MRAM and WRAM. MRAM
+      %    sits under A and WRAM under the vectors, which keeps the arrows
+      %    from crossing more than they have to.
+      \pgfmathsetmacro\dw{\yx+\vw}
+      \def\dh{1.1} \def\dy{-2.3}
+      \foreach \k in {3,2,1}
+        \draw[fill=white, draw=cink2] (\k*0.1,\dy+\k*0.1) rectangle ++(\dw,\dh);
+      \draw[fill=white, thick] (0,\dy) rectangle ++(\dw,\dh);
+      \node[anchor=north west, font=\scriptsize\bfseries] at (0.04,\dy+\dh-0.02) {DPU};
+      \node[draw=cblue, thick, fill=cblue!30, minimum width=1.7cm, minimum height=.55cm] (mram) at (\K/2+0.2,\dy+\dh/2-0.1) {MRAM};
+      \node[draw=corange, thick, fill=corange!50, minimum width=1.1cm, minimum height=.55cm] (wram) at (\xx+0.5,\dy+\dh/2-0.1) {WRAM};
+
+      % ── Where the tiles go: blue into MRAM, orange into WRAM
+      \begin{scope}[-{Latex[length=1.5mm]}, thick]
+        \draw[cblue] (\tx+\tk/2+0.15,\ty-\tm) to[out=-90, in=100] (mram.north);
+        \draw[cblue] (\xx+\vw/2,\xoff+\xtop-\tk) to[out=-100, in=60] ([xshift=-2mm]mram.north east);
+        \draw[cblue] (\yx+\vw/2,\ty-\tm) to[out=-100, in=40] (mram.north east);
+        \draw[corange] (\tx,\ty-\wm/2) to[out=180, in=180, looseness=1.3] (\tx-0.25,\ty-\tm-0.35) to[out=0, in=140] (wram.north west);
+        \draw[corange] (\xx,\xoff+\xtop-\wk/2) to[out=180, in=100] ([xshift=1mm]wram.north west);
+        \draw[corange] (\yx+\vw,\ty-\wm/2) to[out=0, in=60] (wram.north east);
+      \end{scope}
     \end{tikzpicture}
-    \column{.46\textwidth}
+    \column{.56\textwidth}
+    \footnotesize
+    \textcolor{cblue}{\textbf{MRAM tile}}: \texttt{M.mram}$\times$\texttt{K.mram}, one per (DPU, tasklet)\par
+    \textcolor{corange}{\textbf{WRAM tile}}: \texttt{M.wram}$\times$\texttt{K.wram}, copied in one at a time\par
+    \texttt{order}: which dimension is spread across DPUs first
+    \bigskip
+
+    \pause
     \textbf{Each choice must satisfy}
-    \medskip
-    \begin{itemize}\small
-      \item tiles divide the extents: $\texttt{M.mram} \mid 1024$, $\texttt{K.mram} \mid 1024$
-      \item inner tiles divide outer ones: $\texttt{M.wram} \mid \texttt{M.mram}$, \ldots
-      \item one tile per worker:\\ $\dfrac{1024}{\texttt{M.mram}} \cdot \dfrac{1024}{\texttt{K.mram}} = \texttt{dpus} \cdot \texttt{tasklets}$
-      \item what the tasklets hold fits: $\le$ MRAM, $\le$ WRAM
-      \item DMA granularity: tiles are multiples of 8 bytes
+    % The class's list style sets its own size and spacing
+    \begin{itemize}[itemsep=1pt, topsep=2pt]\footnotesize
+      \item tiles divide the extents: $\texttt{M.mram} \mid 1024$, \ldots
+      \item WRAM tiles divide MRAM tiles: $\texttt{M.wram} \mid \texttt{M.mram}$, \ldots
+      \item one tile per worker: $\frac{1024}{\texttt{M.mram}} \cdot \frac{1024}{\texttt{K.mram}} = \texttt{dpus} \cdot \texttt{tasklets}$
+      \item what the tasklets hold fits in MRAM and WRAM
+      \item tiles are multiples of the 8-byte DMA granule
     \end{itemize}
   \end{columns}
-  \bigskip
-  % \centering\small Every arrow in the picture is a parameter; every ``must'' is a constraint.
 \end{frame}
 
 \begin{frame}{The hardware knobs are not separate}
@@ -236,7 +312,7 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
 \notebookframe{1}{The design space}{The program, its parameters and the constraints between them. \quad \faClock\ 7 min}
 
 % ─────────────────────────────────────────────────────────────────────────
-\section{Evaluating a configuration}
+\sectionframe{Evaluating a configuration}
 
 \begin{frame}{Lowering one configuration}
   \begin{columns}[T]
@@ -244,9 +320,9 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
     Given a configuration, Cinnamon compiles the program:
     \medskip
     \begin{itemize}\small
-      \item \textbf{cinm $\to$ linalg}: the operation becomes a loop nest
+      \item \textbf{cinm $\to$ linalg}: using builtin operators
       \item \textbf{linalg $\to$ cnm}: the loop nest is split over a workgroup of \texttt{dpus} $\times$ \texttt{tasklets} workers. Inputs are scattered into per-worker MRAM buffers, the result is gathered back.
-      \item \textbf{WRAM tiling}: each worker's kernel loops over its MRAM tile, copying WRAM-sized pieces into the scratchpad
+      \item \textbf{On-device tiling}: each worker's kernel loops over its MRAM tile, copying WRAM-sized pieces into the scratchpad
       \item \textbf{cnm $\to$ upmem}: transfers between host and DPUs, DPU allocation, the tasklet code
     \end{itemize}
     \column{.46\textwidth}
@@ -265,38 +341,38 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
 \end{frame}
 
 \begin{frame}{Estimating the latency}
+  \footnotesize The estimate for one configuration is the sum of
   \begin{columns}[T]
     \column{.48\textwidth}
-    The estimate for one configuration is the sum of
-    \medskip
-    \begin{itemize}\small
+    \begin{itemize}[itemsep=0pt, topsep=1pt]\footnotesize
       \item the \textbf{DPU kernel}, from a cycle-accurate DPU simulator (or a faster approximation of it)
       \item the \textbf{launch overhead}, calibrated on hardware
+    \end{itemize}
+    \column{.48\textwidth}
+    \begin{itemize}[itemsep=0pt, topsep=1pt]\footnotesize
       \item \textbf{host work}: rearranging data before transfers, reductions on the host
       \item \textbf{transfers} to and from the DPUs
     \end{itemize}
-    \medskip
-    \small One estimate takes 30--60\,ms on one core with the fast simulator.
-    \column{.48\textwidth}
-    \centering
-    \fbox{\parbox{.9\linewidth}{\centering\vspace{4em}fidelity plot:\\ simulated vs.\ measured\vspace{4em}}}
   \end{columns}
+  \centering
+  \includegraphics[width=\textwidth,height=.5\textheight,keepaspectratio]{figures/fidelity.pdf}
 \end{frame}
 
 \notebookframe{2}{Evaluating a configuration}{Pick a configuration, follow its lowering, simulate it, and see where it ranks. \quad \faClock\ 8 min}
 
 % ─────────────────────────────────────────────────────────────────────────
-\section{Searching the space}
+\sectionframe{Searching the space}
 
 \begin{frame}{Enumerating is not an option}
   \centering
-  \begin{tabular}{@{}lrrr@{}}
+  \small
+  \begin{tabular}{@{}lrrl@{}}
     \toprule
     & feasible & one core, fast simulator & \\
     \midrule
-    $1024^2$ gemv, 1 rank & 3\,234 & 3 min & \small the oracle you just used \\
-    $4096^2$ gemv, 32 ranks & 26\,238 & 1.5 h & \small enumerated once, on 14 cores \\
-    $2048^2$ gemm, 32 ranks & 2\,821\,332 & \textbf{47 h} & \small not enumerated \\
+    $1024^2$ gemv, 1 rank & 3\,234 & 3 min & oracle in notebook 2 \\
+    $4096^2$ gemv, 32 ranks & 26\,238 & 1.5 h & enumerated on 14 cores \\
+    $2048^2$ gemm, 32 ranks & 2\,821\,332 & \textbf{47 h} & not enumerated \\
     \bottomrule
   \end{tabular}
   \bigskip
@@ -305,8 +381,8 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
 \end{frame}
 
 \begin{frame}{Search strategies}
-  \centering\small
-  \begin{tabular}{@{}lll@{}}
+  \centering\footnotesize
+  \begin{tabular}{@{}p{.27\textwidth}p{.43\textwidth}p{.2\textwidth}@{}}
     \toprule
     strategy & how the next configuration is chosen & uses past results \\
     \midrule
@@ -352,7 +428,7 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
 \notebookframe{3}{Searching the space}{Bayesian optimisation with 40 and 100 simulations, several seeds, and a larger space. \quad \faClock\ 8 min}
 
 % ─────────────────────────────────────────────────────────────────────────
-\section{Wrap-up}
+\sectionframe{Wrap-up}
 
 \begin{frame}{Where enumeration was never an option}
   \begin{columns}[T]
@@ -390,8 +466,7 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
   \centering\small Cinnamon: \texttt{github.com/tud-ccc/Cinnamon} \quad this tutorial: \texttt{[repository]}
 \end{frame}
 
-\begin{frame}[standout]
-  Questions?
+\begin{frame}[sectionpage]{Questions?}
 \end{frame}
 
 % ─────────────────────────────────────────────────────────────────────────
@@ -425,8 +500,8 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
     \column{.55\textwidth}
     \includegraphics[width=\linewidth]{figures/seeds_small_40.pdf}
     \column{.42\textwidth}
-    \textbf{Small space, budget 40, ten seeds}\par\smallskip
-    \footnotesize
+    \textbf{Budget 40, ten seeds}\par\smallskip
+    \scriptsize
     \begin{tabular}{@{}rrr@{}}
       \toprule
       seed & best [ms] & rank \\
@@ -445,7 +520,7 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
     \end{tabular}
     \smallskip
 
-    \small Four of ten seeds find one of the best configurations; random search does so 14\,\% of the time. With a budget of 100, four of five seeds find the optimum.
+    \footnotesize 4 of 10 seeds find one of the best configurations (random search: 14\,\%). With 100 simulations, 4 of 5 find the optimum.
   \end{columns}
 \end{frame}
 
