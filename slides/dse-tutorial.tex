@@ -135,20 +135,21 @@
     \end{itemize}
     \pause
     \column{.46\textwidth}
-    \small In Cinnamon's MLIR input:
-    \begin{semiverbatim}\tiny
-#upmem = #upmem.platform<type = v1A,
-                          dpus = 64, tasklets = 24>
+%     \small In Cinnamon's MLIR input:
+%     \begin{semiverbatim}\tiny
+% #upmem = #upmem.platform<type = v1A,
+%                           dpus = 64, tasklets = 24>
 
-func.func @gemv(\%A: tensor<1024x1024xi32>,
-                \%x: tensor<1024xi32>)
-    attributes \{cinm.available_platforms = [#upmem]\} \{
-  cinm.compute \{
-    \%y = cinm.op.gemv \%A, \%x
-  \}
-\}
-    \end{semiverbatim}
-    % \footnotesize One DRAM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
+% func.func @gemv(\%A: tensor<1024x1024xi32>,
+%                 \%x: tensor<1024xi32>)
+%     attributes \{cinm.available_platforms = [#upmem]\} \{
+%   cinm.compute \{
+%     \%y = cinm.op.gemv \%A, \%x
+%   \}
+% \}
+%     \end{semiverbatim}
+\vfill
+    One UPMEM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
   \end{columns}
 \end{frame}
 
@@ -228,6 +229,143 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
       \end{scope}
     \end{tikzpicture}
     \column{.56\textwidth}
+    \vfill
+    One UPMEM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
+    % \footnotesize
+    % \textcolor{cblue}{\textbf{MRAM tile}}: \texttt{M.mram}$\times$\texttt{K.mram}, one per (DPU, tasklet)\par
+    % \textcolor{corange}{\textbf{WRAM tile}}: \texttt{M.wram}$\times$\texttt{K.wram}, copied in one at a time\par
+    % \texttt{order}: which dimension is spread across DPUs first
+    % \bigskip
+
+    % \pause
+    % One UPMEM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
+    % \textbf{Each choice must satisfy}
+    % % The class's list style sets its own size and spacing
+    % \begin{itemize}[itemsep=1pt, topsep=2pt]\footnotesize
+    %   \item tiles divide the extents: $\texttt{M.mram} \mid 1024$, \ldots
+    %   \item WRAM tiles divide MRAM tiles: $\texttt{M.wram} \mid \texttt{M.mram}$, \ldots
+    %   \item one tile per worker: $\frac{1024}{\texttt{M.mram}} \cdot \frac{1024}{\texttt{K.mram}} = \texttt{dpus} \cdot \texttt{tasklets}$
+    %   \item what the tasklets hold fits in MRAM and WRAM
+    %   \item tiles are multiples of the 8-byte DMA granule
+    % \end{itemize}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Cinnamon}
+  \centering
+  \begin{tikzpicture}[node distance=.5cm, every node/.style={font=\small, align=left}, lvl/.style={draw, rounded corners, minimum width=2.2cm, minimum height=.8cm, align=center, font=\small\bfseries}]
+    \node[lvl, fill=cgrid] (cinm) {cinm};
+    \node[lvl, fill=cgrid, below=of cinm] (linalg) {linalg};
+    \node[lvl, fill=cblue!20, below=of linalg] (cnm) {cnm};
+    \node[lvl, fill=corange!25, below=of cnm] (upmem) {upmem};
+    \foreach \a/\b in {cinm/linalg, linalg/cnm, cnm/upmem} \draw[-{Latex}, thick] (\a) -- (\b);
+    \node[right=.6cm of cinm] {operations on tensors: \texttt{gemv}, \texttt{gemm}, \ldots};
+    \node[right=.6cm of linalg] {loop nests over tensors};
+    \node[right=.6cm of cnm] {any CNM device: workgroups of workers, buffers in their memory,\\ scatter / launch / gather};
+    \node[right=.6cm of upmem] {one device: DPU allocation, host--DPU transfers, tasklet code};
+    \node[below=.5cm of upmem, xshift=3.8cm, font=\footnotesize\color{cink2}] {other targets lower from cnm the same way};
+  \end{tikzpicture}
+  \bigskip
+
+  \small Each step down needs decisions: how many workers, how to tile, how to distribute. These are the parameters of the design space.
+\end{frame}
+
+\begin{frame}{From the program to a space}
+  \centering
+  \begin{tikzpicture}[node distance=.9cm and 1.4cm, every node/.style={font=\small, align=center}, box/.style={draw, rounded corners, minimum height=1.1cm, minimum width=2.9cm}]
+    \node[box, fill=cgrid] (prog) {program\\ \scriptsize loop nest, extents, element types};
+    \node[box, fill=cgrid, below=of prog] (hw) {platform\\ \scriptsize levels, capacities, DMA, worker counts};
+    \node[box, fill=cblue!20, right=of $(prog)!.5!(hw)$] (cs) {constraint system\\ \scriptsize parameters + relations};
+    \node[box, fill=cblue!20, right=of cs] (feas) {feasible set\\ \scriptsize every legal configuration};
+    \draw[-{Latex}, thick] (prog) -- (cs);
+    \draw[-{Latex}, thick] (hw) -- (cs);
+    \draw[-{Latex}, thick] (cs) -- node[above, font=\scriptsize] {solve} (feas);
+  \end{tikzpicture}
+  \bigskip
+
+  \small Cinnamon generates the parameters and the constraints between them from the program and the platform description, and enumerates the feasible configurations with a constraint solver.
+\end{frame}
+
+\notebookframe{1}{The design space}{The program, its parameters and the constraints between them. \quad \faClock\ 5 min}
+
+
+\begin{frame}{Tiling to the memory levels}
+  \begin{columns}[T]
+    \column{.42\textwidth}
+    \begin{tikzpicture}[every node/.style={font=\scriptsize}]
+      % ── Sizes, in cm. The tile sizes are drawing sizes, not the real ones.
+      \def\M{2.4}     % rows of A, entries of y
+      \def\K{2.4}     % columns of A, entries of x
+      \def\tm{0.6}    % MRAM tile: rows    (M.mram)
+      \def\tk{1.2}    % MRAM tile: columns (K.mram)
+      \def\wm{0.3}    % WRAM tile: rows    (M.wram)
+      \def\wk{0.4}    % WRAM tile: columns (K.wram)
+      \def\ti{1}      % the highlighted MRAM tile: its row, from the top
+      \def\tj{0}      % and its column
+      \def\vw{0.28}   % width of the drawn vectors
+      \def\gap{0.45}  % space around the operators
+      % ── Derived positions
+      \pgfmathsetmacro\tx{\tj*\tk}              % left edge of the tile in A
+      \pgfmathsetmacro\ty{\M-\ti*\tm}           % top edge of the tile in A
+      \pgfmathsetmacro\xx{\K+2*\gap}            % left edge of x
+      \pgfmathsetmacro\xtop{\K-\tj*\tk}         % top of x's tile (x is drawn top to bottom)
+      \pgfmathsetmacro\yx{\xx+\vw+2*\gap}       % left edge of y
+      \pgfmathsetmacro\xoff{(\M-\K)/2}          % centres x vertically on A
+
+      % ── A: the MRAM tile grid, one MRAM tile, and a WRAM tile inside it
+      \fill[cgrid] (0,0) rectangle (\K,\M);
+      \draw[cblue!45, xstep=\tk, ystep=\tm] (0,0) grid (\K,\M);
+      \draw (0,0) rectangle (\K,\M);
+      \fill[cblue!30, draw=cblue, thick] (\tx,\ty-\tm) rectangle (\tx+\tk,\ty);
+      \fill[corange!50, draw=corange, thick] (\tx,\ty-\wm) rectangle (\tx+\wk,\ty);
+      \node[above] at (\K/2,\M) {$A$};
+      \node[font=\normalsize] at (\K+\gap,\M/2) {$\cdot$};
+
+      % ── x: the K.mram entries the tile multiplies, and the WRAM part of them
+      \begin{scope}[shift={(\xx,\xoff)}]
+        \fill[cgrid] (0,0) rectangle (\vw,\K);
+        \draw[cblue!45, ystep=\tk, xstep=\vw] (0,0) grid (\vw,\K);
+        \draw (0,0) rectangle (\vw,\K);
+        \fill[cblue!30, draw=cblue, thick] (0,\xtop-\tk) rectangle (\vw,\xtop);
+        \fill[corange!50, draw=corange, thick] (0,\xtop-\wk) rectangle (\vw,\xtop);
+        \node[above] at (\vw/2,\K) {$x$};
+      \end{scope}
+      \node[font=\normalsize] at (\xx+\vw+\gap,\M/2) {$=$};
+
+      % ── y: the M.mram entries the tile produces, and the WRAM part of them
+      \begin{scope}[shift={(\yx,0)}]
+        \fill[cgrid] (0,0) rectangle (\vw,\M);
+        \draw[cblue!45, ystep=\tm, xstep=\vw] (0,0) grid (\vw,\M);
+        \draw (0,0) rectangle (\vw,\M);
+        \fill[cblue!30, draw=cblue, thick] (0,\ty-\tm) rectangle (\vw,\ty);
+        \fill[corange!50, draw=corange, thick] (0,\ty-\wm) rectangle (\vw,\ty);
+        \node[above] at (\vw/2,\M) {$y$};
+      \end{scope}
+
+      % ── The device: a stack of DPUs, each with its MRAM and WRAM. MRAM
+      %    sits under A and WRAM under the vectors, which keeps the arrows
+      %    from crossing more than they have to.
+      \pgfmathsetmacro\dw{\yx+\vw}
+      \def\dh{1.1} \def\dy{-2.3}
+      \foreach \k in {3,2,1}
+        \draw[fill=white, draw=cink2] (\k*0.1,\dy+\k*0.1) rectangle ++(\dw,\dh);
+      \draw[fill=white, thick] (0,\dy) rectangle ++(\dw,\dh);
+      \node[anchor=north west, font=\scriptsize\bfseries] at (0.04,\dy+\dh-0.02) {DPU};
+      \node[draw=cblue, thick, fill=cblue!30, minimum width=1.7cm, minimum height=.55cm] (mram) at (\K/2+0.2,\dy+\dh/2-0.1) {MRAM};
+      \node[draw=corange, thick, fill=corange!50, minimum width=1.1cm, minimum height=.55cm] (wram) at (\xx+0.5,\dy+\dh/2-0.1) {WRAM};
+
+      % ── Where the tiles go: blue into MRAM, orange into WRAM
+      \begin{scope}[-{Latex[length=1.5mm]}, thick]
+        \draw[cblue] (\tx+\tk/2+0.15,\ty-\tm) to[out=-90, in=100] (mram.north);
+        \draw[cblue] (\xx+\vw/2,\xoff+\xtop-\tk) to[out=-100, in=60] ([xshift=-2mm]mram.north east);
+        \draw[cblue] (\yx+\vw/2,\ty-\tm) to[out=-100, in=40] (mram.north east);
+        \draw[corange] (\tx,\ty-\wm/2) to[out=180, in=180, looseness=1.3] (\tx-0.25,\ty-\tm-0.35) to[out=0, in=140] (wram.north west);
+        \draw[corange] (\xx,\xoff+\xtop-\wk/2) to[out=180, in=100] ([xshift=1mm]wram.north west);
+        \draw[corange] (\yx+\vw,\ty-\wm/2) to[out=0, in=60] (wram.north east);
+      \end{scope}
+    \end{tikzpicture}
+    \column{.56\textwidth}
+    \vfill
     \footnotesize
     \textcolor{cblue}{\textbf{MRAM tile}}: \texttt{M.mram}$\times$\texttt{K.mram}, one per (DPU, tasklet)\par
     \textcolor{corange}{\textbf{WRAM tile}}: \texttt{M.wram}$\times$\texttt{K.wram}, copied in one at a time\par
@@ -273,44 +411,6 @@ func.func @gemv(\%A: tensor<1024x1024xi32>,
   \bigskip
   \centering So hardware and tiling parameters have to be chosen together.
 \end{frame}
-
-\begin{frame}{Cinnamon}
-  \centering
-  \begin{tikzpicture}[node distance=.5cm, every node/.style={font=\small, align=left}, lvl/.style={draw, rounded corners, minimum width=2.2cm, minimum height=.8cm, align=center, font=\small\bfseries}]
-    \node[lvl, fill=cgrid] (cinm) {cinm};
-    \node[lvl, fill=cgrid, below=of cinm] (linalg) {linalg};
-    \node[lvl, fill=cblue!20, below=of linalg] (cnm) {cnm};
-    \node[lvl, fill=corange!25, below=of cnm] (upmem) {upmem};
-    \foreach \a/\b in {cinm/linalg, linalg/cnm, cnm/upmem} \draw[-{Latex}, thick] (\a) -- (\b);
-    \node[right=.6cm of cinm] {operations on tensors: \texttt{gemv}, \texttt{gemm}, \ldots};
-    \node[right=.6cm of linalg] {loop nests over tensors};
-    \node[right=.6cm of cnm] {any CNM device: workgroups of workers, buffers in their memory,\\ scatter / launch / gather};
-    \node[right=.6cm of upmem] {one device: DPU allocation, host--DPU transfers, tasklet code};
-    \node[below=.5cm of upmem, xshift=3.8cm, font=\footnotesize\color{cink2}] {other targets lower from cnm the same way};
-  \end{tikzpicture}
-  \bigskip
-
-  \small Each step down needs decisions: how many workers, how to tile, how to distribute. These are the parameters of the design space.
-\end{frame}
-
-\begin{frame}{From the program to a space}
-  \centering
-  \begin{tikzpicture}[node distance=.9cm and 1.4cm, every node/.style={font=\small, align=center}, box/.style={draw, rounded corners, minimum height=1.1cm, minimum width=2.9cm}]
-    \node[box, fill=cgrid] (prog) {program\\ \scriptsize loop nest, extents, element types};
-    \node[box, fill=cgrid, below=of prog] (hw) {platform\\ \scriptsize levels, capacities, DMA, worker counts};
-    \node[box, fill=cblue!20, right=of $(prog)!.5!(hw)$] (cs) {constraint system\\ \scriptsize parameters + relations};
-    \node[box, fill=cblue!20, right=of cs] (feas) {feasible set\\ \scriptsize every legal configuration};
-    \draw[-{Latex}, thick] (prog) -- (cs);
-    \draw[-{Latex}, thick] (hw) -- (cs);
-    \draw[-{Latex}, thick] (cs) -- node[above, font=\scriptsize] {solve} (feas);
-  \end{tikzpicture}
-  \bigskip
-
-  \small Cinnamon generates the parameters and the constraints between them from the program and the platform description, and enumerates the feasible configurations with a constraint solver.
-\end{frame}
-
-\notebookframe{1}{The design space}{The program, its parameters and the constraints between them. \quad \faClock\ 7 min}
-
 % ─────────────────────────────────────────────────────────────────────────
 \sectionframe{Evaluating a configuration}
 
