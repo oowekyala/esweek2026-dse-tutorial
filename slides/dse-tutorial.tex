@@ -148,14 +148,13 @@
 %   \}
 % \}
 %     \end{semiverbatim}
-\vfill
-    One UPMEM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
+% \vfill
+    % One UPMEM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
   \end{columns}
 \end{frame}
 
 \begin{frame}{Tiling to the memory levels}
-  \begin{columns}[T]
-    \column{.42\textwidth}
+  \centering
     \begin{tikzpicture}[every node/.style={font=\scriptsize}]
       % ── Sizes, in cm. The tile sizes are drawing sizes, not the real ones.
       \def\M{2.4}     % rows of A, entries of y
@@ -210,13 +209,22 @@
       %    sits under A and WRAM under the vectors, which keeps the arrows
       %    from crossing more than they have to.
       \pgfmathsetmacro\dw{\yx+\vw}
-      \def\dh{1.1} \def\dy{-2.3}
-      \foreach \k in {3,2,1}
-        \draw[fill=white, draw=cink2] (\k*0.1,\dy+\k*0.1) rectangle ++(\dw,\dh);
+      \def\dh{1.3} \def\dy{-2.5}
+      \def\ndpu{3}    % DPUs drawn behind the front one
+      \def\dstep{0.15} % offset between them
+      \foreach \k in {\ndpu,...,1}
+        \draw[fill=white, draw=cink2] (\k*\dstep,\dy+\k*\dstep) rectangle ++(\dw,\dh);
       \draw[fill=white, thick] (0,\dy) rectangle ++(\dw,\dh);
       \node[anchor=north west, font=\scriptsize\bfseries] at (0.04,\dy+\dh-0.02) {DPU};
-      \node[draw=cblue, thick, fill=cblue!30, minimum width=1.7cm, minimum height=.55cm] (mram) at (\K/2+0.2,\dy+\dh/2-0.1) {MRAM};
-      \node[draw=corange, thick, fill=corange!50, minimum width=1.1cm, minimum height=.55cm] (wram) at (\xx+0.5,\dy+\dh/2-0.1) {WRAM};
+      \node[draw=cblue, thick, fill=cblue!30, minimum width=1.7cm, minimum height=.55cm] (mram) at (\K/2+0.2,\dy+\dh/2+0.05) {MRAM};
+      \node[draw=corange, thick, fill=corange!50, minimum width=1.1cm, minimum height=.55cm] (wram) at (\xx+0.5,\dy+\dh/2+0.05) {WRAM};
+      \node[below=1pt of mram, font=\tiny] {64\,MB};
+      \node[below=1pt of wram, font=\tiny] {64\,KB};
+      % The number of DPUs, along the depth of the stack: from the front DPU's
+      % bottom-right corner to the last one's, set off the corners a little
+      \draw[{Latex[length=1.2mm]}-{Latex[length=1.2mm]}, cink2]
+        ([shift={(0.08,-0.08)}] \dw,\dy) -- ([shift={(0.08,-0.08)}] \dw+\ndpu*\dstep,\dy+\ndpu*\dstep)
+        node[right, font=\scriptsize, text=cink] {64};
 
       % ── Where the tiles go: blue into MRAM, orange into WRAM
       \begin{scope}[-{Latex[length=1.5mm]}, thick]
@@ -228,27 +236,6 @@
         \draw[corange] (\yx+\vw,\ty-\wm/2) to[out=0, in=60] (wram.north east);
       \end{scope}
     \end{tikzpicture}
-    \column{.56\textwidth}
-    \vfill
-    One UPMEM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
-    % \footnotesize
-    % \textcolor{cblue}{\textbf{MRAM tile}}: \texttt{M.mram}$\times$\texttt{K.mram}, one per (DPU, tasklet)\par
-    % \textcolor{corange}{\textbf{WRAM tile}}: \texttt{M.wram}$\times$\texttt{K.wram}, copied in one at a time\par
-    % \texttt{order}: which dimension is spread across DPUs first
-    % \bigskip
-
-    % \pause
-    % One UPMEM rank: 64 DPUs, up to 24 tasklets each, 64 MB MRAM and 64 KB WRAM per DPU.
-    % \textbf{Each choice must satisfy}
-    % % The class's list style sets its own size and spacing
-    % \begin{itemize}[itemsep=1pt, topsep=2pt]\footnotesize
-    %   \item tiles divide the extents: $\texttt{M.mram} \mid 1024$, \ldots
-    %   \item WRAM tiles divide MRAM tiles: $\texttt{M.wram} \mid \texttt{M.mram}$, \ldots
-    %   \item one tile per worker: $\frac{1024}{\texttt{M.mram}} \cdot \frac{1024}{\texttt{K.mram}} = \texttt{dpus} \cdot \texttt{tasklets}$
-    %   \item what the tasklets hold fits in MRAM and WRAM
-    %   \item tiles are multiples of the 8-byte DMA granule
-    % \end{itemize}
-  \end{columns}
 \end{frame}
 
 \begin{frame}{Cinnamon}
@@ -270,6 +257,8 @@
   \small Each step down needs decisions: how many workers, how to tile, how to distribute. These are the parameters of the design space.
 \end{frame}
 
+\notebookframe{1}{The design space}{The program, its parameters and the constraints between them. \quad \faClock\ 5 min}
+
 \begin{frame}{From the program to a space}
   \centering
   \begin{tikzpicture}[node distance=.9cm and 1.4cm, every node/.style={font=\small, align=center}, box/.style={draw, rounded corners, minimum height=1.1cm, minimum width=2.9cm}]
@@ -286,7 +275,224 @@
   \small Cinnamon generates the parameters and the constraints between them from the program and the platform description, and enumerates the feasible configurations with a constraint solver.
 \end{frame}
 
-\notebookframe{1}{The design space}{The program, its parameters and the constraints between them. \quad \faClock\ 5 min}
+
+% ─────────────────────────────────────────────────────────────────────────
+\sectionframe{Evaluating a configuration}
+
+\begin{frame}{Lowering one configuration}
+  \begin{columns}[T]
+    \column{.5\textwidth}
+    Given a configuration, Cinnamon compiles the program:
+    \medskip
+    \begin{itemize}\small
+      \item \textbf{cinm $\to$ linalg}: using builtin operators
+      \item \textbf{linalg $\to$ cnm}: the loop nest is split over a workgroup of \texttt{dpus} $\times$ \texttt{tasklets} workers. Inputs are scattered into per-worker MRAM buffers, the result is gathered back.
+      \item \textbf{On-device tiling}: each worker's kernel loops over its MRAM tile, copying WRAM-sized pieces into the scratchpad
+      \item \textbf{cnm $\to$ upmem}: transfers between host and DPUs, DPU allocation, the tasklet code
+    \end{itemize}
+    \column{.46\textwidth}
+    \small
+    \begin{tabular}{@{}ll@{}}
+      \toprule
+      parameter & used at \\
+      \midrule
+      \texttt{dpus}, \texttt{tasklets} & workgroup shape \\
+      \texttt{M.mram}, \texttt{K.mram} & cnm buffer shapes \\
+      \texttt{order} & scatter / gather maps \\
+      \texttt{M.wram}, \texttt{K.wram} & kernel loops \\
+      \bottomrule
+    \end{tabular}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Estimating the latency}
+  \footnotesize The estimate for one configuration is the sum of
+  \begin{columns}[T]
+    \column{.48\textwidth}
+    \begin{itemize}[itemsep=0pt, topsep=1pt]\footnotesize
+      \item the \textbf{DPU kernel}, from a cycle-accurate DPU simulator (or a faster approximation of it)
+      \item the \textbf{launch overhead}, calibrated on hardware
+    \end{itemize}
+    \column{.48\textwidth}
+    \begin{itemize}[itemsep=0pt, topsep=1pt]\footnotesize
+      \item \textbf{host work}: rearranging data before transfers, reductions on the host
+      \item \textbf{transfers} to and from the DPUs
+    \end{itemize}
+  \end{columns}
+  \centering
+  \includegraphics[width=\textwidth,height=.5\textheight,keepaspectratio]{figures/fidelity.pdf}
+\end{frame}
+
+\notebookframe{2}{Evaluating a configuration}{Pick a configuration, follow its lowering, simulate it, and see where it ranks. \quad \faClock\ 8 min}
+
+% ─────────────────────────────────────────────────────────────────────────
+\sectionframe{Searching the space}
+
+\begin{frame}{Enumerating is not an option}
+  \centering
+  \small
+  \begin{tabular}{@{}lrrl@{}}
+    \toprule
+    & feasible & one core, fast simulator & \\
+    \midrule
+    $1024^2$ gemv, 1 rank & 3\,234 & 3 min & oracle in notebook 2 \\
+    $4096^2$ gemv, 32 ranks & 26\,238 & 1.5 h & enumerated on 14 cores \\
+    $2048^2$ gemm, 32 ranks & 2\,821\,332 & \textbf{47 h} & not enumerated \\
+    \bottomrule
+  \end{tabular}
+  \bigskip
+
+  Every configuration a search visits costs one simulation, so a search is judged by how good a configuration it finds for a given number of simulations.
+\end{frame}
+
+\begin{frame}{Search strategies}
+  \centering\footnotesize
+  \begin{tabular}{@{}p{.27\textwidth}p{.43\textwidth}p{.2\textwidth}@{}}
+    \toprule
+    strategy & how the next configuration is chosen & uses past results \\
+    \midrule
+    exhaustive & every feasible one, in order & no \\
+    random & uniformly at random & no \\
+    local search, simulated annealing & a neighbour of the current one & the current one \\
+    genetic algorithm & recombining good ones & a population \\
+    Bayesian optimisation & where a model of the cost looks promising & all of them \\
+    \bottomrule
+  \end{tabular}
+  \bigskip
+
+  The more a strategy learns from past results, the more it can save on simulations, and the more it costs to decide what to simulate next.
+\end{frame}
+
+\begin{frame}{Bayesian optimisation in one slide}
+  \begin{columns}[T]
+    \column{.55\textwidth}
+    \begin{enumerate}
+      \item \textbf{Initial sample}: simulate a few random configurations
+      \item \textbf{Surrogate}: fit a model to the results. For any configuration it predicts a cost $\mu$ and an uncertainty $\sigma$ \\ \small usually a Gaussian process; in Cinnamon an ensemble of small neural networks
+      \item \textbf{Acquisition}: score candidates by $\mu - \kappa\sigma$, so both a low predicted cost and a high uncertainty make a candidate attractive
+      \item \textbf{Simulate} the best-scoring candidate, add it to the results, go to 2
+    \end{enumerate}
+    \column{.42\textwidth}
+    \begin{tikzpicture}[scale=.85, every node/.style={font=\scriptsize}]
+      % The curves are sampled from a mean that interpolates the observations
+      % and a sigma that vanishes at them and grows with the distance to the
+      % nearest one, levelling off far away (1.15 (1 - exp(-(d/0.6)^2))), so
+      % mu - sigma is lowest in the wide gap on the right.
+      \draw[->] (0,0) -- (4.6,0) node[below left] {configuration};
+      \draw[->] (0,0) -- (0,3.6) node[left] {cost};
+      \fill[cblue!15] plot coordinates {(0.20,1.171) (0.25,1.107) (0.30,1.055) (0.35,1.019) (0.40,1.000) (0.45,0.998) (0.50,1.013) (0.55,1.042) (0.60,1.085) (0.65,1.139) (0.70,1.202) (0.75,1.271) (0.80,1.343) (0.85,1.249) (0.90,1.153) (0.95,1.061) (1.00,0.978) (1.05,0.911) (1.10,0.864) (1.15,0.843) (1.20,0.850) (1.25,0.887) (1.30,0.948) (1.35,1.032) (1.40,1.135) (1.45,1.253) (1.50,1.382) (1.55,1.518) (1.60,1.657) (1.65,1.794) (1.70,1.926) (1.75,2.054) (1.80,2.029) (1.85,2.004) (1.90,1.979) (1.95,1.955) (2.00,1.932) (2.05,1.913) (2.10,1.899) (2.15,1.889) (2.20,1.887) (2.25,1.890) (2.30,1.900) (2.35,1.909) (2.40,1.913) (2.45,1.916) (2.50,1.921) (2.55,1.931) (2.60,1.948) (2.65,1.975) (2.70,2.013) (2.75,2.055) (2.80,2.091) (2.85,2.124) (2.90,2.152) (2.95,2.178) (3.00,2.202) (3.05,2.227) (3.10,2.256) (3.15,2.288) (3.20,2.323) (3.25,2.360) (3.30,2.397) (3.35,2.434) (3.40,2.469) (3.45,2.501) (3.50,2.529) (3.55,2.552) (3.60,2.573) (3.65,2.593) (3.70,2.614) (3.75,2.638) (3.80,2.667) (3.85,2.704) (3.90,2.749) (3.95,2.810) (4.00,2.887) (4.05,2.975) (4.10,3.068) (4.15,3.162) (4.20,3.250)} -- plot coordinates {(4.20,0.950) (4.15,0.862) (4.10,0.769) (4.05,0.675) (4.00,0.587) (3.95,0.511) (3.90,0.451) (3.85,0.407) (3.80,0.372) (3.75,0.345) (3.70,0.324) (3.65,0.307) (3.60,0.294) (3.55,0.282) (3.50,0.271) (3.45,0.259) (3.40,0.248) (3.35,0.241) (3.30,0.240) (3.25,0.248) (3.20,0.266) (3.15,0.297) (3.10,0.344) (3.05,0.409) (3.00,0.492) (2.95,0.589) (2.90,0.698) (2.85,0.816) (2.80,0.940) (2.75,1.065) (2.70,1.187) (2.65,1.311) (2.60,1.439) (2.55,1.564) (2.50,1.679) (2.45,1.776) (2.40,1.850) (2.35,1.893) (2.30,1.900) (2.25,1.874) (2.20,1.824) (2.15,1.750) (2.10,1.657) (2.05,1.547) (2.00,1.423) (1.95,1.291) (1.90,1.154) (1.85,1.015) (1.80,0.878) (1.75,0.746) (1.70,0.774) (1.65,0.805) (1.60,0.832) (1.55,0.855) (1.50,0.873) (1.45,0.886) (1.40,0.893) (1.35,0.893) (1.30,0.885) (1.25,0.871) (1.20,0.850) (1.15,0.827) (1.10,0.801) (1.05,0.772) (1.00,0.736) (0.95,0.694) (0.90,0.644) (0.85,0.585) (0.80,0.517) (0.75,0.607) (0.70,0.693) (0.65,0.773) (0.60,0.843) (0.55,0.903) (0.50,0.950) (0.45,0.982) (0.40,1.000) (0.35,1.003) (0.30,0.992) (0.25,0.967) (0.20,0.929)} -- cycle;
+      \draw[cblue, thick] plot coordinates {(0.20,1.050) (0.25,1.037) (0.30,1.024) (0.35,1.011) (0.40,1.000) (0.45,0.990) (0.50,0.981) (0.55,0.973) (0.60,0.964) (0.65,0.956) (0.70,0.948) (0.75,0.939) (0.80,0.930) (0.85,0.917) (0.90,0.898) (0.95,0.877) (1.00,0.857) (1.05,0.841) (1.10,0.833) (1.15,0.835) (1.20,0.850) (1.25,0.879) (1.30,0.917) (1.35,0.962) (1.40,1.014) (1.45,1.070) (1.50,1.128) (1.55,1.187) (1.60,1.244) (1.65,1.299) (1.70,1.350) (1.75,1.400) (1.80,1.454) (1.85,1.509) (1.90,1.566) (1.95,1.623) (2.00,1.678) (2.05,1.730) (2.10,1.778) (2.15,1.820) (2.20,1.855) (2.25,1.882) (2.30,1.900) (2.35,1.901) (2.40,1.881) (2.45,1.846) (2.50,1.800) (2.55,1.748) (2.60,1.694) (2.65,1.643) (2.70,1.600) (2.75,1.560) (2.80,1.516) (2.85,1.470) (2.90,1.425) (2.95,1.383) (3.00,1.347) (3.05,1.318) (3.10,1.300) (3.15,1.293) (3.20,1.295) (3.25,1.304) (3.30,1.319) (3.35,1.338) (3.40,1.359) (3.45,1.380) (3.50,1.400) (3.55,1.417) (3.60,1.434) (3.65,1.450) (3.70,1.469) (3.75,1.491) (3.80,1.520) (3.85,1.555) (3.90,1.600) (3.95,1.660) (4.00,1.737) (4.05,1.825) (4.10,1.919) (4.15,2.012) (4.20,2.100)};
+      \foreach \x/\y in {0.4/1.0, 1.2/0.85, 2.3/1.9} \fill[cink] (\x,\y) circle (2pt);
+      \draw[corange, thick, dashed] (3.30,0) -- (3.30,2.397);
+      \fill[corange] (3.30,0.240) circle (1.6pt) node[right, font=\tiny] {$\mu - \sigma$};
+      \node[corange, above] at (3.30,2.397) {next: high $\sigma$};
+      \draw[caqua, thick, dashed] (1.10,0) -- (1.10,0.833);
+      \node[caqua, below] at (1.10,0) {low $\mu$};
+      \node[cblue] at (1.5,2.5) {$\mu \pm \sigma$};
+    \end{tikzpicture}
+  \end{columns}
+  \medskip
+  \small The search only proposes feasible configurations, so no simulation is spent on a configuration that cannot be compiled.
+\end{frame}
+
+\notebookframe{3}{Searching the space}{Bayesian optimisation with 40 and 100 simulations, several seeds, and a larger space. \quad \faClock\ 8 min}
+
+% ─────────────────────────────────────────────────────────────────────────
+\sectionframe{Wrap-up}
+
+\begin{frame}{Where enumeration was never an option}
+  \begin{columns}[T]
+    \column{.58\textwidth}
+    \includegraphics[width=\linewidth]{figures/seeds_big_100.pdf}
+    \column{.4\textwidth}
+    \textbf{26\,238 configurations, budget 100}\par\smallskip
+    \small
+    \begin{tabular}{@{}lrr@{}}
+      \toprule
+      & ms & rank \\
+      \midrule
+      optimum (oracle) & 7.0 & 1 \\
+      Bayesian, best of 5 seeds & 7.0 & 1 \\
+      Bayesian, median seed & 7.3 & 8 \\
+      Bayesian, worst seed & 19.5 & 82 \\
+      random search, median & 46 & \\
+      median configuration & 125 & \\
+      \bottomrule
+    \end{tabular}
+    \medskip
+
+    Three of five seeds end within 10\,\% of the optimum, after simulating 0.4\,\% of the space. Only 10 of the 26\,238 configurations are that close.
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Take-aways}
+  \begin{enumerate}
+    \item Cinnamon generates a design space from from the program and the platform
+    \item Hardware parameters (DPUs, tasklets) and tiling parameters have to be chosen together
+    \item On a small instance an exhaustive run shows what the landscape looks like, and gives the optimum to compare searches against.
+    \item Search results depend on the random seed, but higher sample budget often smoothes out differences.
+  \end{enumerate}
+  \bigskip
+  \centering\small Cinnamon: \texttt{github.com/tud-ccc/Cinnamon} \quad this tutorial: \texttt{[repository]}
+\end{frame}
+
+\begin{frame}[sectionpage]{Questions?}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────
+\appendix
+
+\begin{frame}{We simulated all 3\,234}
+  \begin{columns}[T]
+    \column{.6\textwidth}
+    \includegraphics[width=\linewidth]{figures/histogram.pdf}
+    \column{.38\textwidth}
+    \begin{tabular}{@{}lr@{}}
+      \toprule
+      best & 1.60 ms \\
+      1st percentile & 6.25 ms \\
+      median & 9.50 ms \\
+      worst & 21.8 ms \\
+      \midrule
+      within 10\,\% of best & \textbf{6} \\
+      within 1.5$\times$ & 11 \\
+      within 2$\times$ & 19 \\
+      \bottomrule
+    \end{tabular}
+    \medskip
+
+    The best 0.3\,\% of configurations are $5\times$ faster than the median.
+  \end{columns}
+\end{frame}
+
+\begin{frame}{What a budget buys}
+  \begin{columns}[T]
+    \column{.55\textwidth}
+    \includegraphics[width=\linewidth]{figures/seeds_small_40.pdf}
+    \column{.42\textwidth}
+    \textbf{Budget 40, ten seeds}\par\smallskip
+    \scriptsize
+    \begin{tabular}{@{}rrr@{}}
+      \toprule
+      seed & best [ms] & rank \\
+      \midrule
+      166 & 1.60 & 1 \\
+      197 & 1.61 & 2 \\
+      104 & 1.64 & 4 \\
+      290 & 1.67 & 6 \\
+      135 & 2.41 & 11 \\
+      73 & 7.85 & 45 \\
+      259 & 7.87 & 66 \\
+      228 & 7.89 & 80 \\
+      42 & 7.90 & 103 \\
+      321 & 7.91 & 107 \\
+      \bottomrule
+    \end{tabular}
+    \smallskip
+
+    \footnotesize 4 of 10 seeds find one of the best configurations (random search: 14\,\%). With 100 simulations, 4 of 5 find the optimum.
+  \end{columns}
+\end{frame}
 
 
 \begin{frame}{Tiling to the memory levels}
@@ -411,217 +617,4 @@
   \bigskip
   \centering So hardware and tiling parameters have to be chosen together.
 \end{frame}
-% ─────────────────────────────────────────────────────────────────────────
-\sectionframe{Evaluating a configuration}
-
-\begin{frame}{Lowering one configuration}
-  \begin{columns}[T]
-    \column{.5\textwidth}
-    Given a configuration, Cinnamon compiles the program:
-    \medskip
-    \begin{itemize}\small
-      \item \textbf{cinm $\to$ linalg}: using builtin operators
-      \item \textbf{linalg $\to$ cnm}: the loop nest is split over a workgroup of \texttt{dpus} $\times$ \texttt{tasklets} workers. Inputs are scattered into per-worker MRAM buffers, the result is gathered back.
-      \item \textbf{On-device tiling}: each worker's kernel loops over its MRAM tile, copying WRAM-sized pieces into the scratchpad
-      \item \textbf{cnm $\to$ upmem}: transfers between host and DPUs, DPU allocation, the tasklet code
-    \end{itemize}
-    \column{.46\textwidth}
-    \small
-    \begin{tabular}{@{}ll@{}}
-      \toprule
-      parameter & used at \\
-      \midrule
-      \texttt{dpus}, \texttt{tasklets} & workgroup shape \\
-      \texttt{M.mram}, \texttt{K.mram} & cnm buffer shapes \\
-      \texttt{order} & scatter / gather maps \\
-      \texttt{M.wram}, \texttt{K.wram} & kernel loops \\
-      \bottomrule
-    \end{tabular}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Estimating the latency}
-  \footnotesize The estimate for one configuration is the sum of
-  \begin{columns}[T]
-    \column{.48\textwidth}
-    \begin{itemize}[itemsep=0pt, topsep=1pt]\footnotesize
-      \item the \textbf{DPU kernel}, from a cycle-accurate DPU simulator (or a faster approximation of it)
-      \item the \textbf{launch overhead}, calibrated on hardware
-    \end{itemize}
-    \column{.48\textwidth}
-    \begin{itemize}[itemsep=0pt, topsep=1pt]\footnotesize
-      \item \textbf{host work}: rearranging data before transfers, reductions on the host
-      \item \textbf{transfers} to and from the DPUs
-    \end{itemize}
-  \end{columns}
-  \centering
-  \includegraphics[width=\textwidth,height=.5\textheight,keepaspectratio]{figures/fidelity.pdf}
-\end{frame}
-
-\notebookframe{2}{Evaluating a configuration}{Pick a configuration, follow its lowering, simulate it, and see where it ranks. \quad \faClock\ 8 min}
-
-% ─────────────────────────────────────────────────────────────────────────
-\sectionframe{Searching the space}
-
-\begin{frame}{Enumerating is not an option}
-  \centering
-  \small
-  \begin{tabular}{@{}lrrl@{}}
-    \toprule
-    & feasible & one core, fast simulator & \\
-    \midrule
-    $1024^2$ gemv, 1 rank & 3\,234 & 3 min & oracle in notebook 2 \\
-    $4096^2$ gemv, 32 ranks & 26\,238 & 1.5 h & enumerated on 14 cores \\
-    $2048^2$ gemm, 32 ranks & 2\,821\,332 & \textbf{47 h} & not enumerated \\
-    \bottomrule
-  \end{tabular}
-  \bigskip
-
-  Every configuration a search visits costs one simulation, so a search is judged by how good a configuration it finds for a given number of simulations.
-\end{frame}
-
-\begin{frame}{Search strategies}
-  \centering\footnotesize
-  \begin{tabular}{@{}p{.27\textwidth}p{.43\textwidth}p{.2\textwidth}@{}}
-    \toprule
-    strategy & how the next configuration is chosen & uses past results \\
-    \midrule
-    exhaustive & every feasible one, in order & no \\
-    random & uniformly at random & no \\
-    local search, simulated annealing & a neighbour of the current one & the current one \\
-    genetic algorithm & recombining good ones & a population \\
-    Bayesian optimisation & where a model of the cost looks promising & all of them \\
-    \bottomrule
-  \end{tabular}
-  \bigskip
-
-  The more a strategy learns from past results, the more it can save on simulations, and the more it costs to decide what to simulate next.
-\end{frame}
-
-\begin{frame}{Bayesian optimisation in one slide}
-  \begin{columns}[T]
-    \column{.55\textwidth}
-    \begin{enumerate}
-      \item \textbf{Initial sample}: simulate a few random configurations
-      \item \textbf{Surrogate}: fit a model to the results. For any configuration it predicts a cost $\mu$ and an uncertainty $\sigma$ \\ \small usually a Gaussian process; in Cinnamon an ensemble of small neural networks
-      \item \textbf{Acquisition}: score candidates by $\mu - \kappa\sigma$, so both a low predicted cost and a high uncertainty make a candidate attractive
-      \item \textbf{Simulate} the best-scoring candidate, add it to the results, go to 2
-    \end{enumerate}
-    \column{.42\textwidth}
-    \begin{tikzpicture}[scale=.85, every node/.style={font=\scriptsize}]
-      \draw[->] (0,0) -- (4.6,0) node[below left] {configuration};
-      \draw[->] (0,0) -- (0,3) node[left] {cost};
-      \fill[cblue!15] plot[smooth] coordinates {(0.2,1.4) (1,1.1) (2,2.2) (3,1.6) (4.2,2.5)} -- plot[smooth] coordinates {(4.2,1.3) (3,1.0) (2,1.4) (1,0.7) (0.2,0.6)} -- cycle;
-      \draw[cblue, thick] plot[smooth] coordinates {(0.2,1.0) (1,0.9) (2,1.8) (3,1.3) (4.2,1.9)};
-      \foreach \x/\y in {0.4/1.0, 1.2/0.85, 2.3/1.9, 3.1/1.3} \fill[cink] (\x,\y) circle (2pt);
-      \draw[corange, thick, dashed] (3.9,0) -- (3.9,2.5);
-      \node[corange, above] at (3.9,2.5) {next: high $\sigma$};
-      \draw[caqua, thick, dashed] (1.1,0) -- (1.1,0.9);
-      \node[caqua, below] at (1.1,0) {low $\mu$};
-      \node[cblue, right] at (2.1,2.6) {$\mu \pm \sigma$};
-    \end{tikzpicture}
-  \end{columns}
-  \medskip
-  \small The search only proposes feasible configurations, so no simulation is spent on a configuration that cannot be compiled.
-\end{frame}
-
-\notebookframe{3}{Searching the space}{Bayesian optimisation with 40 and 100 simulations, several seeds, and a larger space. \quad \faClock\ 8 min}
-
-% ─────────────────────────────────────────────────────────────────────────
-\sectionframe{Wrap-up}
-
-\begin{frame}{Where enumeration was never an option}
-  \begin{columns}[T]
-    \column{.58\textwidth}
-    \includegraphics[width=\linewidth]{figures/seeds_big_100.pdf}
-    \column{.4\textwidth}
-    \textbf{26\,238 configurations, budget 100}\par\smallskip
-    \small
-    \begin{tabular}{@{}lrr@{}}
-      \toprule
-      & ms & rank \\
-      \midrule
-      optimum (oracle) & 7.0 & 1 \\
-      Bayesian, best of 5 seeds & 7.0 & 1 \\
-      Bayesian, median seed & 7.3 & 8 \\
-      Bayesian, worst seed & 19.5 & 82 \\
-      random search, median & 46 & \\
-      median configuration & 125 & \\
-      \bottomrule
-    \end{tabular}
-    \medskip
-
-    Three of five seeds end within 10\,\% of the optimum, after simulating 0.4\,\% of the space. Only 10 of the 26\,238 configurations are that close.
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Take-aways}
-  \begin{enumerate}
-    \item The design space follows from the program and the platform: the parameters and the constraints between them can be generated rather than written by hand.
-    \item Hardware parameters (DPUs, tasklets) and tiling parameters have to be chosen together. The best number of tasklets changes with the problem size.
-    \item On a small instance an exhaustive run shows what the landscape looks like, and gives the optimum to compare searches against.
-    \item Search results depend on the random seed: compare several runs, not one.
-  \end{enumerate}
-  \bigskip
-  \centering\small Cinnamon: \texttt{github.com/tud-ccc/Cinnamon} \quad this tutorial: \texttt{[repository]}
-\end{frame}
-
-\begin{frame}[sectionpage]{Questions?}
-\end{frame}
-
-% ─────────────────────────────────────────────────────────────────────────
-\appendix
-
-\begin{frame}{We simulated all 3\,234}
-  \begin{columns}[T]
-    \column{.6\textwidth}
-    \includegraphics[width=\linewidth]{figures/histogram.pdf}
-    \column{.38\textwidth}
-    \begin{tabular}{@{}lr@{}}
-      \toprule
-      best & 1.60 ms \\
-      1st percentile & 6.25 ms \\
-      median & 9.50 ms \\
-      worst & 21.8 ms \\
-      \midrule
-      within 10\,\% of best & \textbf{6} \\
-      within 1.5$\times$ & 11 \\
-      within 2$\times$ & 19 \\
-      \bottomrule
-    \end{tabular}
-    \medskip
-
-    The best 0.3\,\% of configurations are $5\times$ faster than the median.
-  \end{columns}
-\end{frame}
-
-\begin{frame}{What a budget buys}
-  \begin{columns}[T]
-    \column{.55\textwidth}
-    \includegraphics[width=\linewidth]{figures/seeds_small_40.pdf}
-    \column{.42\textwidth}
-    \textbf{Budget 40, ten seeds}\par\smallskip
-    \scriptsize
-    \begin{tabular}{@{}rrr@{}}
-      \toprule
-      seed & best [ms] & rank \\
-      \midrule
-      166 & 1.60 & 1 \\
-      197 & 1.61 & 2 \\
-      104 & 1.64 & 4 \\
-      290 & 1.67 & 6 \\
-      135 & 2.41 & 11 \\
-      73 & 7.85 & 45 \\
-      259 & 7.87 & 66 \\
-      228 & 7.89 & 80 \\
-      42 & 7.90 & 103 \\
-      321 & 7.91 & 107 \\
-      \bottomrule
-    \end{tabular}
-    \smallskip
-
-    \footnotesize 4 of 10 seeds find one of the best configurations (random search: 14\,\%). With 100 simulations, 4 of 5 find the optimum.
-  \end{columns}
-\end{frame}
-
 \end{document}
